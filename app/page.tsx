@@ -1,5 +1,9 @@
-import ARNavigator from "@/components/ARNavigator";
+import dynamic from "next/dynamic";
 import { DirectionStep } from "../app/types";
+
+const ARNavigator = dynamic(() => import("@/components/ARNavigator"), {
+  ssr: false,
+});
 
 const directions: DirectionStep[] = [
   { id: 1, text: "Walk straight for 50m", distance: 50, type: "straight" },
