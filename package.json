@@ -9,13 +9,19 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.4",
+    "@heroicons/react": "^2.2.0",
+    "@react-three/drei": "^10.5.0",
+    "@react-three/fiber": "^9.2.0",
     "aframe": "^1.7.1",
     "aframe-ar": "^0.2.1-a",
     "aframe-look-at-component": "^1.0.0",
     "ar.js": "^2.2.2",
+    "drei": "^2.2.21",
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-webcam": "^7.2.0",
     "three": "^0.178.0"
   },
   "devDependencies": {
