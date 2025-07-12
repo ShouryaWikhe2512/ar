@@ -56,6 +56,7 @@ export default function LocationAR() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -89,66 +90,102 @@ export default function LocationAR() {
     }
   }, []);
 
+  // Effect to handle video stream when cameraStream changes
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      console.log("Setting video srcObject");
+      videoRef.current.srcObject = cameraStream;
+
+      videoRef.current.onloadedmetadata = () => {
+        console.log("Video metadata loaded");
+        if (videoRef.current) {
+          videoRef.current
+            .play()
+            .then(() => {
+              console.log("Video playing successfully");
+            })
+            .catch((err) => {
+              console.error("Error playing video:", err);
+              setError("Failed to play video stream");
+            });
+        }
+      };
+
+      videoRef.current.oncanplay = () => {
+        console.log("Video can play");
+      };
+
+      videoRef.current.onerror = (e) => {
+        console.error("Video error:", e);
+        setError("Video stream error occurred");
+      };
+    }
+  }, [cameraStream]);
+
   const startCamera = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Request camera access with specific constraints
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment", // Use back camera
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-
-        // Wait for video to load and play
-        videoRef.current.onloadedmetadata = () => {
-          if (videoRef.current) {
-            videoRef.current
-              .play()
-              .then(() => {
-                setShowCamera(true);
-                setIsLoading(false);
-                console.log("Camera started successfully");
-              })
-              .catch((err) => {
-                console.error("Error playing video:", err);
-                setError(
-                  "Camera started but failed to display. Please refresh and try again."
-                );
-                setIsLoading(false);
-              });
-          }
-        };
-
-        videoRef.current.onerror = () => {
-          console.error("Video error occurred");
-          setError("Camera error occurred. Please try again.");
-          setIsLoading(false);
-        };
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera access not supported");
       }
-    } catch (err) {
+
+      // Try to get camera stream with environment-facing camera first
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment", // Use back camera
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+          },
+          audio: false,
+        });
+      } catch (err) {
+        console.log("Environment camera failed, trying user-facing camera");
+        // Fallback to user-facing camera if environment camera fails
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user", // Use front camera as fallback
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+          },
+          audio: false,
+        });
+      }
+
+      console.log("Camera stream obtained:", stream);
+      setCameraStream(stream);
+      setShowCamera(true);
+      setIsLoading(false);
+    } catch (err: any) {
       console.error("Error accessing camera:", err);
-      setError(
-        "Unable to access camera. Please allow camera permissions and try again."
-      );
+
+      // Provide specific error messages based on error type
+      if (err.name === "NotAllowedError") {
+        setError(
+          "Camera access denied. Please allow camera permissions and try again."
+        );
+      } else if (err.name === "NotFoundError") {
+        setError("No camera found on this device.");
+      } else if (err.name === "NotSupportedError") {
+        setError("Camera not supported on this device.");
+      } else {
+        setError(`Camera error: ${err.message || "Unknown error"}`);
+      }
       setIsLoading(false);
     }
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => {
         track.stop();
         console.log("Camera track stopped:", track.kind);
       });
+      setCameraStream(null);
       setShowCamera(false);
       console.log("Camera stopped");
     }
@@ -221,8 +258,8 @@ export default function LocationAR() {
   return (
     <div className="w-full h-screen bg-gray-900 flex flex-col">
       {/* Camera Feed Container */}
-      <div className="relative w-full h-2/3 bg-black">
-        {showCamera ? (
+      <div className="relative w-full h-2/3 bg-black overflow-hidden">
+        {showCamera && cameraStream ? (
           <>
             {/* Camera Video Background */}
             <video
@@ -238,11 +275,17 @@ export default function LocationAR() {
                 width: "100%",
                 height: "100%",
                 zIndex: 1,
+                backgroundColor: "black",
               }}
             />
 
             {/* AR Overlay on top of camera */}
             <div className="absolute inset-0 z-10 pointer-events-none">
+              {/* Camera Status Indicator */}
+              <div className="absolute top-4 right-4 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold">
+                📷 LIVE
+              </div>
+
               {/* Directional Arrow Overlay */}
               <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                 <div className="text-6xl text-[#04b7cf] animate-pulse drop-shadow-lg">
