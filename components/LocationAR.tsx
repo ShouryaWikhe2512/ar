@@ -2,93 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Hardcoded GPS coordinates for demo locations in Pune, India - 5 meter intervals
-const LOCATION_MARKERS = [
-  {
-    id: 1,
-    name: "Start Point",
-    instruction: "Start here",
-    gps: { lat: 18.5291, lng: 73.8564 }, // Base location
-    direction: "north",
-    distance: 5,
-  },
-  {
-    id: 2,
-    name: "First Turn",
-    instruction: "Turn right and walk 5 meters",
-    gps: { lat: 18.5291, lng: 73.8565 }, // 5m east
-    direction: "east",
-    distance: 5,
-  },
-  {
-    id: 3,
-    name: "Second Turn",
-    instruction: "Turn left and walk 5 meters",
-    gps: { lat: 18.5292, lng: 73.8565 }, // 5m north
-    direction: "north",
-    distance: 5,
-  },
-  {
-    id: 4,
-    name: "Third Turn",
-    instruction: "Turn right and walk 5 meters",
-    gps: { lat: 18.5292, lng: 73.8566 }, // 5m east
-    direction: "east",
-    distance: 5,
-  },
-  {
-    id: 5,
-    name: "Destination",
-    instruction: "You've reached your destination!",
-    gps: { lat: 18.5293, lng: 73.8566 }, // 5m north
-    direction: "arrived",
-    distance: 0,
-  },
-];
-
 export default function LocationAR() {
-  const [userLocation, setUserLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [userHeading, setUserHeading] = useState<number>(0);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    // Get user's current location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          setError(
-            "Unable to get your location. Please enable location services."
-          );
-        }
-      );
-
-      // Watch for heading changes
-      if ("ondeviceorientation" in window) {
-        window.addEventListener("deviceorientation", (event) => {
-          if (event.alpha !== null) {
-            setUserHeading(event.alpha);
-          }
-        });
-      }
-    } else {
-      setError("Geolocation is not supported by this browser.");
-    }
-  }, []);
 
   // Effect to handle video stream when cameraStream changes
   useEffect(() => {
@@ -191,240 +110,102 @@ export default function LocationAR() {
     }
   };
 
-  const calculateDistance = (
-    lat1: number,
-    lng1: number,
-    lat2: number,
-    lng2: number
-  ) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLng = ((lng2 - lng1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c * 1000; // Convert to meters
-  };
-
-  const getDirectionArrow = (direction: string) => {
-    switch (direction) {
-      case "north":
-        return "⬆️";
-      case "south":
-        return "⬇️";
-      case "east":
-        return "➡️";
-      case "west":
-        return "⬅️";
-      case "arrived":
-        return "🎯";
-      default:
-        return "➡️";
-    }
-  };
-
-  const getCurrentMarker = () => {
-    if (!userLocation) return null;
-
-    const currentMarker = LOCATION_MARKERS[currentStep];
-    const distance = calculateDistance(
-      userLocation.lat,
-      userLocation.lng,
-      currentMarker.gps.lat,
-      currentMarker.gps.lng
-    );
-
-    return { ...currentMarker, distance };
-  };
-
-  const nextStep = () => {
-    if (currentStep < LOCATION_MARKERS.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const previousStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const currentMarker = getCurrentMarker();
-
   return (
-    <div className="w-full h-screen bg-gray-900 flex flex-col">
-      {/* Camera Feed Container */}
-      <div className="relative w-full h-2/3 bg-black overflow-hidden">
-        {showCamera && cameraStream ? (
-          <>
-            {/* Camera Video Background */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                zIndex: 1,
-                backgroundColor: "black",
-              }}
-            />
+    <div className="w-full h-screen bg-black">
+      {showCamera && cameraStream ? (
+        <div className="relative w-full h-full">
+          {/* Camera Video Background */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 1,
+              backgroundColor: "black",
+            }}
+          />
 
-            {/* AR Overlay on top of camera */}
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              {/* Camera Status Indicator */}
-              <div className="absolute top-4 right-4 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold">
-                📷 LIVE
+          {/* AR Overlay - Clean and Simple */}
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            {/* Forward Arrow - Center */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <div className="text-8xl text-[#04b7cf] animate-pulse drop-shadow-2xl">
+                ⬆️
               </div>
+            </div>
 
-              {/* Directional Arrow Overlay */}
-              <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <div className="text-6xl text-[#04b7cf] animate-pulse drop-shadow-lg">
-                  {getDirectionArrow(currentMarker?.direction || "north")}
-                </div>
-              </div>
-
-              {/* Distance Rings */}
-              <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <div className="w-24 h-24 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping drop-shadow-lg"></div>
-                <div
-                  className="w-16 h-16 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping drop-shadow-lg"
-                  style={{ animationDelay: "0.5s" }}
-                ></div>
-              </div>
-
-              {/* Navigation Text Overlay */}
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="bg-black bg-opacity-70 text-white p-3 rounded-lg">
-                  <p className="text-sm font-bold text-center">
-                    {currentMarker?.instruction || "Follow the arrow"}
-                  </p>
-                  <p className="text-xs text-center text-gray-300 mt-1">
-                    Distance: {currentMarker?.distance.toFixed(0) || 0}m
-                  </p>
+            {/* Dairy Section Board - Left Side */}
+            <div className="absolute top-1/3 left-8 transform -translate-y-1/2">
+              <div className="bg-white bg-opacity-90 text-black p-4 rounded-lg shadow-2xl border-2 border-[#04b7cf]">
+                <div className="text-2xl font-bold text-center">🥛</div>
+                <div className="text-lg font-bold text-center mt-2">
+                  Dairy Section
                 </div>
               </div>
             </div>
-          </>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="text-center text-gray-400">
-              <div className="text-6xl mb-4">📱</div>
-              <p className="text-lg font-semibold">
-                Location-Based AR Navigation
-              </p>
-              <p className="text-sm mt-2">Camera feed will appear here</p>
-              <p className="text-xs mt-1 text-gray-500">
-                Click "Start Camera" to begin
-              </p>
+
+            {/* Personal Care Section Board - Right Side */}
+            <div className="absolute top-1/3 right-8 transform -translate-y-1/2">
+              <div className="bg-white bg-opacity-90 text-black p-4 rounded-lg shadow-2xl border-2 border-[#04b7cf]">
+                <div className="text-2xl font-bold text-center">🧴</div>
+                <div className="text-lg font-bold text-center mt-2">
+                  Personal Care
+                </div>
+              </div>
+            </div>
+
+            {/* Distance Rings around arrow */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <div className="w-32 h-32 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping drop-shadow-lg"></div>
+              <div
+                className="w-24 h-24 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping drop-shadow-lg"
+                style={{ animationDelay: "0.5s" }}
+              ></div>
             </div>
           </div>
-        )}
 
-        {/* GPS Info Overlay */}
-        <div className="absolute top-2 left-2 right-2 z-20">
-          <div className="bg-black bg-opacity-70 text-white p-2 rounded-lg text-xs">
-            <h2 className="text-sm font-bold mb-1">🧭 AR Navigation</h2>
-            <p className="text-xs text-gray-300">
-              {userLocation
-                ? `GPS: ${userLocation.lat.toFixed(
-                    4
-                  )}, ${userLocation.lng.toFixed(4)}`
-                : "Getting location..."}
-            </p>
-            <p className="text-xs text-gray-300">
-              Heading: {userHeading.toFixed(1)}°
-            </p>
+          {/* Minimal Camera Controls - Only when needed */}
+          <div className="absolute bottom-4 right-4 z-20">
+            <button
+              onClick={stopCamera}
+              className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors shadow-lg"
+            >
+              ⏹️ Stop
+            </button>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="text-8xl mb-6">📱</div>
+            <h1 className="text-3xl font-bold mb-4">AR Navigation Demo</h1>
+            <p className="text-lg mb-8 text-gray-300">
+              Simple AR experience with camera feed
+            </p>
+            <button
+              onClick={startCamera}
+              disabled={isLoading}
+              className="bg-[#04b7cf] text-white px-8 py-4 rounded-lg text-xl font-semibold hover:bg-[#0399b0] transition-colors disabled:opacity-50 shadow-lg"
+            >
+              {isLoading ? "Starting Camera..." : "📷 Start AR Experience"}
+            </button>
 
-      {/* Control Panel */}
-      <div className="flex-1 bg-gray-800 p-3 overflow-y-auto">
-        <div className="max-w-sm mx-auto">
-          {/* Camera Controls */}
-          <div className="flex justify-center gap-2 mb-3">
-            {!showCamera ? (
-              <button
-                onClick={startCamera}
-                disabled={isLoading}
-                className="bg-[#04b7cf] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0399b0] transition-colors disabled:opacity-50"
-              >
-                {isLoading ? "Starting Camera..." : "📷 Start Camera"}
-              </button>
-            ) : (
-              <button
-                onClick={stopCamera}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
-              >
-                ⏹️ Stop Camera
-              </button>
+            {error && (
+              <div className="mt-4 bg-red-500 text-white p-3 rounded-lg max-w-md mx-auto">
+                <p className="font-semibold">Error:</p>
+                <p className="text-sm">{error}</p>
+              </div>
             )}
           </div>
-
-          {/* Current Step Info */}
-          {currentMarker && (
-            <div className="text-center text-white mb-3">
-              <div className="text-xs text-gray-400 mb-1">
-                Step {currentStep + 1} of {LOCATION_MARKERS.length}
-              </div>
-              <h3 className="text-lg font-bold text-[#04b7cf] mb-1">
-                {currentMarker.name}
-              </h3>
-              <p className="text-sm mb-1">
-                {getDirectionArrow(currentMarker.direction)}{" "}
-                {currentMarker.instruction}
-              </p>
-              <p className="text-xs text-gray-300">
-                Distance: {currentMarker.distance.toFixed(0)}m
-              </p>
-            </div>
-          )}
-
-          {/* Navigation Controls */}
-          <div className="flex justify-center gap-2 mb-3">
-            <button
-              onClick={previousStep}
-              disabled={currentStep === 0}
-              className="bg-gray-600 text-white px-3 py-1 rounded text-xs disabled:opacity-50 hover:bg-gray-700 transition-colors"
-            >
-              ⬅️ Previous
-            </button>
-            <button
-              onClick={nextStep}
-              disabled={currentStep === LOCATION_MARKERS.length - 1}
-              className="bg-[#04b7cf] text-white px-3 py-1 rounded text-xs disabled:opacity-50 hover:bg-[#0399b0] transition-colors"
-            >
-              Next ➡️
-            </button>
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="bg-red-500 text-white p-2 rounded-lg mb-3 text-xs">
-              <p className="font-semibold">Error:</p>
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* Instructions */}
-          <div className="text-center text-gray-400 text-xs">
-            <p>📍 Move device to see AR markers</p>
-            <p>📱 Point camera at sky for best results</p>
-            <p>🎯 Follow arrows to navigate</p>
-            <p>🌍 5-meter intervals for demo</p>
-          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
