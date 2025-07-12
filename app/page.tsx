@@ -1,10 +1,10 @@
 // app/page.tsx
-import ARCanvas from "@/components/ARCanvas";
+import LocationAR from "@/components/LocationAR";
 
 export default function Home() {
   return (
     <main>
-      <ARCanvas />
+      <LocationAR />
     </main>
   );
 }

@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "aframe": "^1.7.1",
+    "aframe-ar": "^0.2.1-a",
+    "aframe-look-at-component": "^1.0.0",
+    "ar.js": "^2.2.2",
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
