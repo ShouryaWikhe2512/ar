@@ -2,45 +2,45 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Hardcoded GPS coordinates for demo locations in Pune, India
+// Hardcoded GPS coordinates for demo locations in Pune, India - 5 meter intervals
 const LOCATION_MARKERS = [
   {
     id: 1,
-    name: "Pune Station",
-    instruction: "Start from Pune Railway Station",
-    gps: { lat: 18.5291, lng: 73.8564 }, // Pune Railway Station
+    name: "Start Point",
+    instruction: "Start here",
+    gps: { lat: 18.5291, lng: 73.8564 }, // Base location
     direction: "north",
-    distance: 50,
+    distance: 5,
   },
   {
     id: 2,
-    name: "FC Road",
-    instruction: "Turn right onto FC Road",
-    gps: { lat: 18.53, lng: 73.857 }, // FC Road intersection
+    name: "First Turn",
+    instruction: "Turn right and walk 5 meters",
+    gps: { lat: 18.5291, lng: 73.8565 }, // 5m east
     direction: "east",
-    distance: 30,
+    distance: 5,
   },
   {
     id: 3,
-    name: "Koregaon Park",
-    instruction: "Continue straight to Koregaon Park",
-    gps: { lat: 18.531, lng: 73.858 }, // Koregaon Park area
+    name: "Second Turn",
+    instruction: "Turn left and walk 5 meters",
+    gps: { lat: 18.5292, lng: 73.8565 }, // 5m north
     direction: "north",
-    distance: 25,
+    distance: 5,
   },
   {
     id: 4,
-    name: "JM Road",
-    instruction: "Turn left onto JM Road",
-    gps: { lat: 18.532, lng: 73.859 }, // JM Road intersection
-    direction: "west",
-    distance: 20,
+    name: "Third Turn",
+    instruction: "Turn right and walk 5 meters",
+    gps: { lat: 18.5292, lng: 73.8566 }, // 5m east
+    direction: "east",
+    distance: 5,
   },
   {
     id: 5,
     name: "Destination",
-    instruction: "You've reached your destination in Pune!",
-    gps: { lat: 18.533, lng: 73.86 }, // Final destination
+    instruction: "You've reached your destination!",
+    gps: { lat: 18.5293, lng: 73.8566 }, // 5m north
     direction: "arrived",
     distance: 0,
   },
@@ -91,17 +91,27 @@ export default function LocationAR() {
 
   const startCamera = async () => {
     try {
+      setIsLoading(true);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // Use back camera
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setShowCamera(true);
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setShowCamera(true);
+          setIsLoading(false);
+        };
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
       setError("Unable to access camera. Please allow camera permissions.");
+      setIsLoading(false);
     }
   };
 
@@ -180,7 +190,7 @@ export default function LocationAR() {
   return (
     <div className="w-full h-screen bg-gray-900 flex flex-col">
       {/* Camera Feed */}
-      <div className="relative w-full h-3/4">
+      <div className="relative w-full h-2/3">
         {showCamera ? (
           <video
             ref={videoRef}
@@ -205,17 +215,17 @@ export default function LocationAR() {
         {showCamera && (
           <div className="absolute inset-0 pointer-events-none">
             {/* Directional Arrow Overlay */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="text-8xl text-[#04b7cf] animate-pulse">
+            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <div className="text-6xl text-[#04b7cf] animate-pulse">
                 {getDirectionArrow(currentMarker?.direction || "north")}
               </div>
             </div>
 
             {/* Distance Rings */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-32 h-32 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping"></div>
+            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <div className="w-24 h-24 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping"></div>
               <div
-                className="w-24 h-24 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping"
+                className="w-16 h-16 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping"
                 style={{ animationDelay: "0.5s" }}
               ></div>
             </div>
@@ -223,19 +233,17 @@ export default function LocationAR() {
         )}
 
         {/* GPS Info Overlay */}
-        <div className="absolute top-4 left-4 right-4 z-10">
-          <div className="bg-black bg-opacity-50 text-white p-4 rounded-lg">
-            <h2 className="text-xl font-bold mb-2">
-              🧭 Location-Based AR Navigation
-            </h2>
-            <p className="text-sm text-gray-300">
+        <div className="absolute top-2 left-2 right-2 z-10">
+          <div className="bg-black bg-opacity-70 text-white p-2 rounded-lg text-xs">
+            <h2 className="text-sm font-bold mb-1">🧭 AR Navigation</h2>
+            <p className="text-xs text-gray-300">
               {userLocation
                 ? `GPS: ${userLocation.lat.toFixed(
                     4
                   )}, ${userLocation.lng.toFixed(4)}`
-                : "Getting your location..."}
+                : "Getting location..."}
             </p>
-            <p className="text-sm text-gray-300">
+            <p className="text-xs text-gray-300">
               Heading: {userHeading.toFixed(1)}°
             </p>
           </div>
@@ -243,21 +251,22 @@ export default function LocationAR() {
       </div>
 
       {/* Control Panel */}
-      <div className="flex-1 bg-gray-800 p-4">
-        <div className="max-w-md mx-auto">
+      <div className="flex-1 bg-gray-800 p-3 overflow-y-auto">
+        <div className="max-w-sm mx-auto">
           {/* Camera Controls */}
-          <div className="flex justify-center gap-4 mb-4">
+          <div className="flex justify-center gap-2 mb-3">
             {!showCamera ? (
               <button
                 onClick={startCamera}
-                className="bg-[#04b7cf] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#0399b0] transition-colors"
+                disabled={isLoading}
+                className="bg-[#04b7cf] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0399b0] transition-colors disabled:opacity-50"
               >
-                📷 Start Camera
+                {isLoading ? "Starting..." : "📷 Start Camera"}
               </button>
             ) : (
               <button
                 onClick={stopCamera}
-                className="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-colors"
+                className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors"
               >
                 ⏹️ Stop Camera
               </button>
@@ -266,36 +275,36 @@ export default function LocationAR() {
 
           {/* Current Step Info */}
           {currentMarker && (
-            <div className="text-center text-white mb-4">
-              <div className="text-sm text-gray-400 mb-2">
+            <div className="text-center text-white mb-3">
+              <div className="text-xs text-gray-400 mb-1">
                 Step {currentStep + 1} of {LOCATION_MARKERS.length}
               </div>
-              <h3 className="text-xl font-bold text-[#04b7cf] mb-2">
+              <h3 className="text-lg font-bold text-[#04b7cf] mb-1">
                 {currentMarker.name}
               </h3>
-              <p className="text-lg mb-2">
+              <p className="text-sm mb-1">
                 {getDirectionArrow(currentMarker.direction)}{" "}
                 {currentMarker.instruction}
               </p>
-              <p className="text-sm text-gray-300">
+              <p className="text-xs text-gray-300">
                 Distance: {currentMarker.distance.toFixed(0)}m
               </p>
             </div>
           )}
 
           {/* Navigation Controls */}
-          <div className="flex justify-center gap-4 mb-4">
+          <div className="flex justify-center gap-2 mb-3">
             <button
               onClick={previousStep}
               disabled={currentStep === 0}
-              className="bg-gray-600 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-gray-700 transition-colors"
+              className="bg-gray-600 text-white px-3 py-1 rounded text-xs disabled:opacity-50 hover:bg-gray-700 transition-colors"
             >
               ⬅️ Previous
             </button>
             <button
               onClick={nextStep}
               disabled={currentStep === LOCATION_MARKERS.length - 1}
-              className="bg-[#04b7cf] text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-[#0399b0] transition-colors"
+              className="bg-[#04b7cf] text-white px-3 py-1 rounded text-xs disabled:opacity-50 hover:bg-[#0399b0] transition-colors"
             >
               Next ➡️
             </button>
@@ -303,18 +312,18 @@ export default function LocationAR() {
 
           {/* Error Display */}
           {error && (
-            <div className="bg-red-500 text-white p-3 rounded-lg mb-4">
+            <div className="bg-red-500 text-white p-2 rounded-lg mb-3 text-xs">
               <p className="font-semibold">Error:</p>
               <p>{error}</p>
             </div>
           )}
 
           {/* Instructions */}
-          <div className="text-center text-gray-400 text-sm">
-            <p>📍 Move your device to see AR markers</p>
-            <p>📱 Point camera at the sky for best results</p>
-            <p>🎯 Follow the arrows to navigate</p>
-            <p>🌍 Uses real GPS coordinates</p>
+          <div className="text-center text-gray-400 text-xs">
+            <p>📍 Move device to see AR markers</p>
+            <p>📱 Point camera at sky for best results</p>
+            <p>🎯 Follow arrows to navigate</p>
+            <p>🌍 5-meter intervals for demo</p>
           </div>
         </div>
       </div>
