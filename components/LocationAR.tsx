@@ -92,25 +92,52 @@ export default function LocationAR() {
   const startCamera = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+
+      // Request camera access with specific constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          facingMode: "environment", // Use back camera
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
+        audio: false,
       });
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+
+        // Wait for video to load and play
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setShowCamera(true);
+          if (videoRef.current) {
+            videoRef.current
+              .play()
+              .then(() => {
+                setShowCamera(true);
+                setIsLoading(false);
+                console.log("Camera started successfully");
+              })
+              .catch((err) => {
+                console.error("Error playing video:", err);
+                setError(
+                  "Camera started but failed to display. Please refresh and try again."
+                );
+                setIsLoading(false);
+              });
+          }
+        };
+
+        videoRef.current.onerror = () => {
+          console.error("Video error occurred");
+          setError("Camera error occurred. Please try again.");
           setIsLoading(false);
         };
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
-      setError("Unable to access camera. Please allow camera permissions.");
+      setError(
+        "Unable to access camera. Please allow camera permissions and try again."
+      );
       setIsLoading(false);
     }
   };
@@ -118,8 +145,12 @@ export default function LocationAR() {
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track) => {
+        track.stop();
+        console.log("Camera track stopped:", track.kind);
+      });
       setShowCamera(false);
+      console.log("Camera stopped");
     }
   };
 
@@ -189,51 +220,75 @@ export default function LocationAR() {
 
   return (
     <div className="w-full h-screen bg-gray-900 flex flex-col">
-      {/* Camera Feed */}
-      <div className="relative w-full h-2/3">
+      {/* Camera Feed Container */}
+      <div className="relative w-full h-2/3 bg-black">
         {showCamera ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
+          <>
+            {/* Camera Video Background */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                zIndex: 1,
+              }}
+            />
+
+            {/* AR Overlay on top of camera */}
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              {/* Directional Arrow Overlay */}
+              <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="text-6xl text-[#04b7cf] animate-pulse drop-shadow-lg">
+                  {getDirectionArrow(currentMarker?.direction || "north")}
+                </div>
+              </div>
+
+              {/* Distance Rings */}
+              <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="w-24 h-24 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping drop-shadow-lg"></div>
+                <div
+                  className="w-16 h-16 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping drop-shadow-lg"
+                  style={{ animationDelay: "0.5s" }}
+                ></div>
+              </div>
+
+              {/* Navigation Text Overlay */}
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="bg-black bg-opacity-70 text-white p-3 rounded-lg">
+                  <p className="text-sm font-bold text-center">
+                    {currentMarker?.instruction || "Follow the arrow"}
+                  </p>
+                  <p className="text-xs text-center text-gray-300 mt-1">
+                    Distance: {currentMarker?.distance.toFixed(0) || 0}m
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
         ) : (
-          <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center">
             <div className="text-center text-gray-400">
               <div className="text-6xl mb-4">📱</div>
               <p className="text-lg font-semibold">
                 Location-Based AR Navigation
               </p>
               <p className="text-sm mt-2">Camera feed will appear here</p>
-            </div>
-          </div>
-        )}
-
-        {/* AR Overlay */}
-        {showCamera && (
-          <div className="absolute inset-0 pointer-events-none">
-            {/* Directional Arrow Overlay */}
-            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="text-6xl text-[#04b7cf] animate-pulse">
-                {getDirectionArrow(currentMarker?.direction || "north")}
-              </div>
-            </div>
-
-            {/* Distance Rings */}
-            <div className="absolute top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-24 h-24 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping"></div>
-              <div
-                className="w-16 h-16 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping"
-                style={{ animationDelay: "0.5s" }}
-              ></div>
+              <p className="text-xs mt-1 text-gray-500">
+                Click "Start Camera" to begin
+              </p>
             </div>
           </div>
         )}
 
         {/* GPS Info Overlay */}
-        <div className="absolute top-2 left-2 right-2 z-10">
+        <div className="absolute top-2 left-2 right-2 z-20">
           <div className="bg-black bg-opacity-70 text-white p-2 rounded-lg text-xs">
             <h2 className="text-sm font-bold mb-1">🧭 AR Navigation</h2>
             <p className="text-xs text-gray-300">
@@ -261,7 +316,7 @@ export default function LocationAR() {
                 disabled={isLoading}
                 className="bg-[#04b7cf] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0399b0] transition-colors disabled:opacity-50"
               >
-                {isLoading ? "Starting..." : "📷 Start Camera"}
+                {isLoading ? "Starting Camera..." : "📷 Start Camera"}
               </button>
             ) : (
               <button
