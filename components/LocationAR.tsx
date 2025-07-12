@@ -1,13 +1,290 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+
+// Navigation steps
+const NAVIGATION_STEPS = [
+  {
+    id: 1,
+    instruction: "Walk Straight",
+    direction: "forward",
+    arrowRotation: 0,
+  },
+  {
+    id: 2,
+    instruction: "Turn Right",
+    direction: "right",
+    arrowRotation: Math.PI / 2,
+  },
+  {
+    id: 3,
+    instruction: "Walk Forward",
+    direction: "forward",
+    arrowRotation: 0,
+  },
+  {
+    id: 4,
+    instruction: "Turn Left",
+    direction: "left",
+    arrowRotation: -Math.PI / 2,
+  },
+  {
+    id: 5,
+    instruction: "Destination Reached!",
+    direction: "arrived",
+    arrowRotation: 0,
+  },
+];
 
 export default function LocationAR() {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const arrowRef = useRef<THREE.Group | null>(null);
+  const boardsRef = useRef<THREE.Group | null>(null);
+
+  // Initialize Three.js scene
+  const initThreeJS = () => {
+    if (!canvasRef.current) return;
+
+    // Create scene
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
+    // Create camera
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 2, 5);
+    cameraRef.current = camera;
+
+    // Create renderer
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvasRef.current,
+      alpha: true,
+      antialias: true,
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0); // Transparent background
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    rendererRef.current = renderer;
+
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    // Add directional light with shadows
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 10, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // Create 3D boards group
+    const boardsGroup = new THREE.Group();
+    boardsRef.current = boardsGroup;
+    scene.add(boardsGroup);
+
+    // Create Dairy Section Board
+    const dairyBoardGeometry = new THREE.BoxGeometry(4, 3, 0.2);
+    const dairyBoardMaterial = new THREE.MeshPhongMaterial({
+      color: 0xffd700,
+      transparent: true,
+      opacity: 0.9,
+      emissive: 0xffd700,
+      emissiveIntensity: 0.2,
+    });
+    const dairyBoard = new THREE.Mesh(dairyBoardGeometry, dairyBoardMaterial);
+    dairyBoard.position.set(-6, 2, -3);
+    dairyBoard.castShadow = true;
+    dairyBoard.receiveShadow = true;
+    boardsGroup.add(dairyBoard);
+
+    // Add text to dairy board
+    const dairyTextGeometry = new THREE.PlaneGeometry(3.5, 2);
+    const dairyTextMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const dairyText = new THREE.Mesh(dairyTextGeometry, dairyTextMaterial);
+    dairyText.position.set(0, 0, 0.12);
+    dairyBoard.add(dairyText);
+
+    // Create Personal Care Section Board
+    const personalCareBoardGeometry = new THREE.BoxGeometry(4, 3, 0.2);
+    const personalCareBoardMaterial = new THREE.MeshPhongMaterial({
+      color: 0xff69b4,
+      transparent: true,
+      opacity: 0.9,
+      emissive: 0xff69b4,
+      emissiveIntensity: 0.2,
+    });
+    const personalCareBoard = new THREE.Mesh(
+      personalCareBoardGeometry,
+      personalCareBoardMaterial
+    );
+    personalCareBoard.position.set(6, 2, -3);
+    personalCareBoard.castShadow = true;
+    personalCareBoard.receiveShadow = true;
+    boardsGroup.add(personalCareBoard);
+
+    // Add text to personal care board
+    const personalCareTextGeometry = new THREE.PlaneGeometry(3.5, 2);
+    const personalCareTextMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const personalCareText = new THREE.Mesh(
+      personalCareTextGeometry,
+      personalCareTextMaterial
+    );
+    personalCareText.position.set(0, 0, 0.12);
+    personalCareBoard.add(personalCareText);
+
+    // Create 3D arrow group
+    const arrowGroup = new THREE.Group();
+    arrowRef.current = arrowGroup;
+    scene.add(arrowGroup);
+
+    // Create arrow cone
+    const arrowGeometry = new THREE.ConeGeometry(0.5, 2, 8);
+    const arrowMaterial = new THREE.MeshPhongMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.9,
+      emissive: 0x00ffff,
+      emissiveIntensity: 0.5,
+    });
+    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
+    arrow.position.set(0, 0, -2);
+    arrow.rotation.x = -Math.PI / 2; // Point forward
+    arrow.castShadow = true;
+    arrowGroup.add(arrow);
+
+    // Create arrow glow sphere
+    const glowGeometry = new THREE.SphereGeometry(0.8, 16, 16);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.3,
+    });
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    arrowGroup.add(glow);
+
+    // Create directional rings
+    const ringGeometry1 = new THREE.RingGeometry(1.2, 1.8, 32);
+    const ringMaterial1 = new THREE.MeshBasicMaterial({
+      color: 0x00ff00,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide,
+    });
+    const ring1 = new THREE.Mesh(ringGeometry1, ringMaterial1);
+    ring1.position.set(0, 0, -2);
+    ring1.rotation.x = -Math.PI / 2;
+    arrowGroup.add(ring1);
+
+    const ringGeometry2 = new THREE.RingGeometry(1.0, 1.4, 32);
+    const ringMaterial2 = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
+    });
+    const ring2 = new THREE.Mesh(ringGeometry2, ringMaterial2);
+    ring2.position.set(0, 0, -2);
+    ring2.rotation.x = -Math.PI / 2;
+    arrowGroup.add(ring2);
+
+    // Ground plane for reference
+    const groundGeometry = new THREE.PlaneGeometry(20, 20);
+    const groundMaterial = new THREE.MeshBasicMaterial({
+      color: 0xcccccc,
+      transparent: true,
+      opacity: 0.1,
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Animation loop
+    const animate = () => {
+      animationRef.current = requestAnimationFrame(animate);
+
+      const time = Date.now() * 0.001;
+
+      // Animate boards floating
+      if (boardsGroup) {
+        boardsGroup.children.forEach((board, index) => {
+          board.position.y = 2 + Math.sin(time + index * Math.PI) * 0.5;
+          board.rotation.y = Math.sin(time * 0.5) * 0.1;
+        });
+      }
+
+      // Animate arrow
+      if (arrowGroup) {
+        arrowGroup.rotation.y = NAVIGATION_STEPS[currentStep].arrowRotation;
+        arrowGroup.position.y = 1 + Math.sin(time * 2) * 0.3;
+
+        // Scale arrow based on step (simulate proximity)
+        const scale = 1 + currentStep * 0.2;
+        arrowGroup.scale.set(scale, scale, scale);
+      }
+
+      // Animate rings
+      if (arrowGroup) {
+        arrowGroup.children.forEach((child, index) => {
+          if (
+            child instanceof THREE.Mesh &&
+            child.geometry instanceof THREE.RingGeometry
+          ) {
+            child.scale.setScalar(1 + Math.sin(time * 2 + index) * 0.3);
+          }
+        });
+      }
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Handle window resize
+    const handleResize = () => {
+      if (cameraRef.current && rendererRef.current) {
+        cameraRef.current.aspect = window.innerWidth / window.innerHeight;
+        cameraRef.current.updateProjectionMatrix();
+        rendererRef.current.setSize(window.innerWidth, window.innerHeight);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+  };
+
+  // Cleanup Three.js
+  const cleanupThreeJS = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    if (rendererRef.current) {
+      rendererRef.current.dispose();
+    }
+  };
 
   // Effect to handle video stream when cameraStream changes
   useEffect(() => {
@@ -40,6 +317,16 @@ export default function LocationAR() {
       };
     }
   }, [cameraStream]);
+
+  // Initialize Three.js when camera starts
+  useEffect(() => {
+    if (showCamera && canvasRef.current) {
+      initThreeJS();
+    }
+    return () => {
+      cleanupThreeJS();
+    };
+  }, [showCamera, currentStep]);
 
   const startCamera = async () => {
     try {
@@ -108,7 +395,22 @@ export default function LocationAR() {
       setShowCamera(false);
       console.log("Camera stopped");
     }
+    cleanupThreeJS();
   };
+
+  const nextStep = () => {
+    if (currentStep < NAVIGATION_STEPS.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const previousStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const currentNavigationStep = NAVIGATION_STEPS[currentStep];
 
   return (
     <div className="w-full h-screen bg-black">
@@ -132,107 +434,54 @@ export default function LocationAR() {
             }}
           />
 
-          {/* AR Overlay with Vibrant Colors */}
-          <div className="absolute inset-0 z-10 pointer-events-none">
-            {/* Floating Dairy Section Board - Left */}
-            <div className="absolute top-1/4 left-8 transform -translate-y-1/2">
-              <div
-                className="bg-gradient-to-br from-yellow-400 to-orange-500 text-black p-6 rounded-2xl shadow-2xl border-4 border-yellow-300"
-                style={{
-                  animation: "float 3s ease-in-out infinite alternate",
-                  boxShadow:
-                    "0 20px 40px rgba(251, 191, 36, 0.4), 0 0 0 4px rgba(251, 191, 36, 0.2)",
-                }}
-              >
-                <div className="text-4xl text-center mb-2">🥛</div>
-                <div className="text-2xl font-black text-center tracking-wide">
-                  DAIRY SECTION
-                </div>
-                <div className="text-sm text-center mt-2 font-bold opacity-80">
-                  Fresh & Natural
-                </div>
-              </div>
+          {/* Three.js Canvas for 3D AR Objects */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full"
+            style={{
+              zIndex: 10,
+              pointerEvents: "none",
+            }}
+          />
+
+          {/* Navigation Instructions Overlay */}
+          <div className="absolute top-6 left-6 right-6 z-20">
+            <div className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white p-4 rounded-2xl shadow-2xl border-2 border-cyan-300">
+              <h2 className="text-xl font-black mb-2">🧭 3D AR Navigation</h2>
+              <p className="text-lg font-bold">
+                Step {currentStep + 1} of {NAVIGATION_STEPS.length}:{" "}
+                {currentNavigationStep.instruction}
+              </p>
+              <p className="text-sm opacity-80">
+                Direction: {currentNavigationStep.direction}
+              </p>
             </div>
+          </div>
 
-            {/* Floating Personal Care Section Board - Right */}
-            <div className="absolute top-1/4 right-8 transform -translate-y-1/2">
-              <div
-                className="bg-gradient-to-br from-pink-400 to-purple-500 text-white p-6 rounded-2xl shadow-2xl border-4 border-pink-300"
-                style={{
-                  animation: "float 3s ease-in-out infinite alternate-reverse",
-                  boxShadow:
-                    "0 20px 40px rgba(236, 72, 153, 0.4), 0 0 0 4px rgba(236, 72, 153, 0.2)",
-                }}
+          {/* Navigation Controls */}
+          <div className="absolute bottom-6 left-6 z-20">
+            <div className="flex gap-2">
+              <button
+                onClick={previousStep}
+                disabled={currentStep === 0}
+                className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-full font-bold shadow-lg border-2 border-gray-400 disabled:opacity-50 hover:from-gray-700 hover:to-gray-800 transition-all duration-300"
               >
-                <div className="text-4xl text-center mb-2">🧴</div>
-                <div className="text-2xl font-black text-center tracking-wide">
-                  PERSONAL CARE
-                </div>
-                <div className="text-sm text-center mt-2 font-bold opacity-80">
-                  Beauty & Wellness
-                </div>
-              </div>
+                ⬅️ Previous
+              </button>
+              <button
+                onClick={nextStep}
+                disabled={currentStep === NAVIGATION_STEPS.length - 1}
+                className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-full font-bold shadow-lg border-2 border-green-400 disabled:opacity-50 hover:from-green-600 hover:to-emerald-600 transition-all duration-300"
+              >
+                Next ➡️
+              </button>
             </div>
+          </div>
 
-            {/* Animated Arrow - Center */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div
-                className="text-8xl text-cyan-400 drop-shadow-2xl"
-                style={{
-                  animation:
-                    "pulse 1.5s ease-in-out infinite, bounce 2s ease-in-out infinite",
-                  filter: "drop-shadow(0 0 20px rgba(34, 211, 238, 0.8))",
-                }}
-              >
-                ⬆️
-              </div>
-
-              {/* Glowing Rings around Arrow */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <div
-                  className="w-32 h-32 border-4 border-cyan-400 rounded-full opacity-60"
-                  style={{
-                    animation: "ping 2s cubic-bezier(0, 0, 0.2, 1) infinite",
-                    boxShadow: "0 0 20px rgba(34, 211, 238, 0.6)",
-                  }}
-                ></div>
-                <div
-                  className="w-24 h-24 border-4 border-emerald-400 rounded-full opacity-80 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                  style={{
-                    animation:
-                      "ping 2s cubic-bezier(0, 0, 0.2, 1) infinite 0.5s",
-                    boxShadow: "0 0 15px rgba(52, 211, 153, 0.6)",
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Navigation Text */}
-            <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2">
-              <div
-                className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-6 py-3 rounded-full shadow-xl border-2 border-cyan-300"
-                style={{
-                  animation: "pulse 2s ease-in-out infinite",
-                  boxShadow: "0 10px 25px rgba(34, 211, 238, 0.3)",
-                }}
-              >
-                <div className="text-lg font-black text-center tracking-wide">
-                  NAVIGATE TO SECTIONS
-                </div>
-              </div>
-            </div>
-
-            {/* AR Status Indicator */}
-            <div className="absolute top-6 right-6">
-              <div
-                className="bg-gradient-to-r from-green-400 to-emerald-500 text-white px-4 py-2 rounded-full font-black text-sm shadow-lg border-2 border-green-300"
-                style={{
-                  animation: "pulse 2s ease-in-out infinite",
-                  boxShadow: "0 5px 15px rgba(34, 197, 94, 0.4)",
-                }}
-              >
-                📱 AR ACTIVE
-              </div>
+          {/* AR Status Indicator */}
+          <div className="absolute top-6 right-6 z-20">
+            <div className="bg-gradient-to-r from-green-400 to-emerald-500 text-white px-4 py-2 rounded-full font-black text-sm shadow-lg border-2 border-green-300">
+              📱 3D AR ACTIVE
             </div>
           </div>
 
@@ -241,9 +490,6 @@ export default function LocationAR() {
             <button
               onClick={stopCamera}
               className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-full font-bold shadow-lg border-2 border-red-300 hover:from-red-600 hover:to-pink-600 transition-all duration-300"
-              style={{
-                boxShadow: "0 5px 15px rgba(239, 68, 68, 0.4)",
-              }}
             >
               ⏹️ STOP AR
             </button>
@@ -254,10 +500,10 @@ export default function LocationAR() {
           <div className="text-center text-white">
             <div className="text-8xl mb-6">📱</div>
             <h1 className="text-4xl font-black mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              VIBRANT AR EXPERIENCE
+              3D AR Navigation
             </h1>
             <p className="text-xl mb-8 text-gray-300">
-              Bold colors, floating boards, and animated arrow
+              Floating 3D boards and animated navigation arrows
             </p>
             <button
               onClick={startCamera}
@@ -267,7 +513,7 @@ export default function LocationAR() {
                 boxShadow: "0 10px 25px rgba(34, 211, 238, 0.4)",
               }}
             >
-              {isLoading ? "Starting Camera..." : "📷 START AR EXPERIENCE"}
+              {isLoading ? "Starting Camera..." : "📷 START 3D AR"}
             </button>
 
             {error && (
@@ -279,36 +525,6 @@ export default function LocationAR() {
           </div>
         </div>
       )}
-
-      {/* Custom CSS for animations */}
-      <style jsx>{`
-        @keyframes float {
-          0% {
-            transform: translateY(-50%) translateX(0px);
-          }
-          100% {
-            transform: translateY(-50%) translateX(10px);
-          }
-        }
-
-        @keyframes bounce {
-          0%,
-          100% {
-            transform: translate(-50%, -50%) scale(1);
-          }
-          50% {
-            transform: translate(-50%, -50%) scale(1.1);
-          }
-        }
-
-        @keyframes ping {
-          75%,
-          100% {
-            transform: scale(2);
-            opacity: 0;
-          }
-        }
-      `}</style>
     </div>
   );
 }
