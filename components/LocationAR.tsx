@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 
 export default function LocationAR() {
   const [showCamera, setShowCamera] = useState(false);
@@ -8,6 +9,173 @@ export default function LocationAR() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const animationRef = useRef<number | null>(null);
+
+  // Initialize Three.js scene
+  const initThreeJS = () => {
+    if (!canvasRef.current) return;
+
+    // Create scene
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
+    // Create camera
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.z = 5;
+    cameraRef.current = camera;
+
+    // Create renderer
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvasRef.current,
+      alpha: true,
+      antialias: true,
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0); // Transparent background
+    rendererRef.current = renderer;
+
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    // Add directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 10, 5);
+    scene.add(directionalLight);
+
+    // Create floating arrow
+    const arrowGeometry = new THREE.ConeGeometry(0.5, 2, 8);
+    const arrowMaterial = new THREE.MeshPhongMaterial({
+      color: 0x04b7cf,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
+    arrow.position.set(0, 0, -3);
+    arrow.rotation.x = -Math.PI / 2; // Point upward
+    scene.add(arrow);
+
+    // Create floating board for Dairy Section
+    const boardGeometry = new THREE.BoxGeometry(3, 2, 0.1);
+    const boardMaterial = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const dairyBoard = new THREE.Mesh(boardGeometry, boardMaterial);
+    dairyBoard.position.set(-4, 0, -2);
+    scene.add(dairyBoard);
+
+    // Create floating board for Personal Care Section
+    const personalCareBoard = new THREE.Mesh(boardGeometry, boardMaterial);
+    personalCareBoard.position.set(4, 0, -2);
+    scene.add(personalCareBoard);
+
+    // Create text labels using HTML overlays for better text rendering
+    const createTextLabel = (text: string, position: THREE.Vector3) => {
+      const div = document.createElement("div");
+      div.className = "ar-text-label";
+      div.textContent = text;
+      div.style.cssText = `
+        position: absolute;
+        color: black;
+        background: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 18px;
+        font-weight: bold;
+        white-space: nowrap;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        border: 2px solid #04b7cf;
+      `;
+      document.body.appendChild(div);
+      return div;
+    };
+
+    // Create text labels
+    const dairyLabel = createTextLabel(
+      "🥛 DAIRY SECTION",
+      new THREE.Vector3(-4, 1.5, -2)
+    );
+    const personalCareLabel = createTextLabel(
+      "🧴 PERSONAL CARE",
+      new THREE.Vector3(4, 1.5, -2)
+    );
+
+    // Function to update text label positions
+    const updateTextLabels = () => {
+      if (dairyLabel && personalCareLabel) {
+        // Position dairy label
+        const dairyPos = new THREE.Vector3(-4, 1.5, -2);
+        dairyPos.project(camera);
+        dairyLabel.style.left =
+          ((dairyPos.x + 1) * window.innerWidth) / 2 + "px";
+        dairyLabel.style.top =
+          ((-dairyPos.y + 1) * window.innerHeight) / 2 + "px";
+
+        // Position personal care label
+        const personalCarePos = new THREE.Vector3(4, 1.5, -2);
+        personalCarePos.project(camera);
+        personalCareLabel.style.left =
+          ((personalCarePos.x + 1) * window.innerWidth) / 2 + "px";
+        personalCareLabel.style.top =
+          ((-personalCarePos.y + 1) * window.innerHeight) / 2 + "px";
+      }
+    };
+
+    // Animation loop
+    const animate = () => {
+      animationRef.current = requestAnimationFrame(animate);
+
+      // Rotate arrow
+      arrow.rotation.y += 0.01;
+
+      // Float boards up and down
+      const time = Date.now() * 0.001;
+      dairyBoard.position.y = Math.sin(time) * 0.5;
+      personalCareBoard.position.y = Math.sin(time + Math.PI) * 0.5;
+
+      // Update text label positions
+      updateTextLabels();
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    // Handle window resize
+    const handleResize = () => {
+      if (cameraRef.current && rendererRef.current) {
+        cameraRef.current.aspect = window.innerWidth / window.innerHeight;
+        cameraRef.current.updateProjectionMatrix();
+        rendererRef.current.setSize(window.innerWidth, window.innerHeight);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+  };
+
+  // Cleanup Three.js
+  const cleanupThreeJS = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    if (rendererRef.current) {
+      rendererRef.current.dispose();
+    }
+    // Clean up text labels
+    const labels = document.querySelectorAll(".ar-text-label");
+    labels.forEach((label) => label.remove());
+  };
 
   // Effect to handle video stream when cameraStream changes
   useEffect(() => {
@@ -40,6 +208,16 @@ export default function LocationAR() {
       };
     }
   }, [cameraStream]);
+
+  // Initialize Three.js when camera starts
+  useEffect(() => {
+    if (showCamera && canvasRef.current) {
+      initThreeJS();
+    }
+    return () => {
+      cleanupThreeJS();
+    };
+  }, [showCamera]);
 
   const startCamera = async () => {
     try {
@@ -108,6 +286,7 @@ export default function LocationAR() {
       setShowCamera(false);
       console.log("Camera stopped");
     }
+    cleanupThreeJS();
   };
 
   return (
@@ -132,46 +311,17 @@ export default function LocationAR() {
             }}
           />
 
-          {/* AR Overlay - Clean and Simple */}
-          <div className="absolute inset-0 z-10 pointer-events-none">
-            {/* Forward Arrow - Center */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="text-8xl text-[#04b7cf] animate-pulse drop-shadow-2xl">
-                ⬆️
-              </div>
-            </div>
+          {/* Three.js Canvas for 3D AR Objects */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full"
+            style={{
+              zIndex: 10,
+              pointerEvents: "none",
+            }}
+          />
 
-            {/* Dairy Section Board - Left Side */}
-            <div className="absolute top-1/3 left-8 transform -translate-y-1/2">
-              <div className="bg-white bg-opacity-90 text-black p-4 rounded-lg shadow-2xl border-2 border-[#04b7cf]">
-                <div className="text-2xl font-bold text-center">🥛</div>
-                <div className="text-lg font-bold text-center mt-2">
-                  Dairy Section
-                </div>
-              </div>
-            </div>
-
-            {/* Personal Care Section Board - Right Side */}
-            <div className="absolute top-1/3 right-8 transform -translate-y-1/2">
-              <div className="bg-white bg-opacity-90 text-black p-4 rounded-lg shadow-2xl border-2 border-[#04b7cf]">
-                <div className="text-2xl font-bold text-center">🧴</div>
-                <div className="text-lg font-bold text-center mt-2">
-                  Personal Care
-                </div>
-              </div>
-            </div>
-
-            {/* Distance Rings around arrow */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-32 h-32 border-4 border-[#04cf84] rounded-full opacity-50 animate-ping drop-shadow-lg"></div>
-              <div
-                className="w-24 h-24 border-4 border-[#04b7cf] rounded-full opacity-70 animate-ping drop-shadow-lg"
-                style={{ animationDelay: "0.5s" }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Minimal Camera Controls - Only when needed */}
+          {/* Minimal Camera Controls */}
           <div className="absolute bottom-4 right-4 z-20">
             <button
               onClick={stopCamera}
@@ -185,16 +335,16 @@ export default function LocationAR() {
         <div className="w-full h-full flex items-center justify-center">
           <div className="text-center text-white">
             <div className="text-8xl mb-6">📱</div>
-            <h1 className="text-3xl font-bold mb-4">AR Navigation Demo</h1>
+            <h1 className="text-3xl font-bold mb-4">3D AR Experience</h1>
             <p className="text-lg mb-8 text-gray-300">
-              Simple AR experience with camera feed
+              Floating 3D objects in AR space
             </p>
             <button
               onClick={startCamera}
               disabled={isLoading}
               className="bg-[#04b7cf] text-white px-8 py-4 rounded-lg text-xl font-semibold hover:bg-[#0399b0] transition-colors disabled:opacity-50 shadow-lg"
             >
-              {isLoading ? "Starting Camera..." : "📷 Start AR Experience"}
+              {isLoading ? "Starting Camera..." : "📷 Start 3D AR"}
             </button>
 
             {error && (
