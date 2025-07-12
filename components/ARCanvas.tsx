@@ -30,79 +30,108 @@ export default function ARCanvas() {
     checkARSupport();
   }, []);
 
-  const createDirectionalArrow = (
+  const createChevronArrow = (
     direction: string,
     color: number = 0x04b7cf,
     size: number = 1
   ) => {
-    const arrowGroup = new THREE.Group();
+    const chevronGroup = new THREE.Group();
 
-    // Create arrow shaft
-    const shaftGeometry = new THREE.CylinderGeometry(
-      0.03 * size,
-      0.03 * size,
-      0.8 * size,
-      8
+    // Create chevron shape using custom geometry
+    const chevronShape = new THREE.Shape();
+    chevronShape.moveTo(-0.2 * size, 0.3 * size);
+    chevronShape.lineTo(0, 0.1 * size);
+    chevronShape.lineTo(0.2 * size, 0.3 * size);
+    chevronShape.lineTo(0.15 * size, 0.4 * size);
+    chevronShape.lineTo(0, 0.2 * size);
+    chevronShape.lineTo(-0.15 * size, 0.4 * size);
+    chevronShape.lineTo(-0.2 * size, 0.3 * size);
+
+    const extrudeSettings = {
+      depth: 0.05 * size,
+      bevelEnabled: true,
+      bevelThickness: 0.02 * size,
+      bevelSize: 0.01 * size,
+      bevelSegments: 3,
+    };
+
+    const chevronGeometry = new THREE.ExtrudeGeometry(
+      chevronShape,
+      extrudeSettings
     );
-    const shaftMaterial = new THREE.MeshStandardMaterial({ color });
-    const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
-    shaft.position.y = 0.4 * size;
-    arrowGroup.add(shaft);
-
-    // Create arrow head
-    const headGeometry = new THREE.ConeGeometry(0.1 * size, 0.25 * size, 8);
-    const headMaterial = new THREE.MeshStandardMaterial({ color });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.y = 0.9 * size;
-    arrowGroup.add(head);
+    const chevronMaterial = new THREE.MeshStandardMaterial({
+      color,
+      metalness: 0.3,
+      roughness: 0.4,
+    });
+    const chevron = new THREE.Mesh(chevronGeometry, chevronMaterial);
+    chevron.rotation.x = -Math.PI / 2;
+    chevronGroup.add(chevron);
 
     // Rotate based on direction
     switch (direction) {
       case "right":
-        arrowGroup.rotation.y = -Math.PI / 2;
+        chevronGroup.rotation.y = -Math.PI / 2;
         break;
       case "left":
-        arrowGroup.rotation.y = Math.PI / 2;
+        chevronGroup.rotation.y = Math.PI / 2;
         break;
       case "backward":
-        arrowGroup.rotation.y = Math.PI;
+        chevronGroup.rotation.y = Math.PI;
         break;
       default: // forward
-        arrowGroup.rotation.y = 0;
+        chevronGroup.rotation.y = 0;
     }
 
-    return arrowGroup;
+    return chevronGroup;
   };
 
-  const createMultipleArrows = (direction: string, count: number = 1) => {
-    const arrowsGroup = new THREE.Group();
+  const createAnimatedChevronPath = (direction: string, count: number = 5) => {
+    const pathGroup = new THREE.Group();
 
     for (let i = 0; i < count; i++) {
-      const arrow = createDirectionalArrow(direction, 0x04b7cf, 1);
-      arrow.position.set(i * 0.3, 0, -i * 0.2); // Stagger arrows
-      arrowsGroup.add(arrow);
+      const chevron = createChevronArrow(direction, 0x04b7cf, 1);
+      chevron.position.set(0, 0.1, -i * 0.4); // Stagger chevrons
+      chevron.userData = {
+        originalZ: -i * 0.4,
+        animationSpeed: 0.02 + i * 0.005, // Different speeds for flow effect
+        index: i,
+      };
+      pathGroup.add(chevron);
     }
 
-    return arrowsGroup;
+    return pathGroup;
   };
 
   const createPathIndicator = (direction: string) => {
     const pathGroup = new THREE.Group();
 
-    // Create path line
-    const lineGeometry = new THREE.CylinderGeometry(0.02, 0.02, 2, 8);
-    const lineMaterial = new THREE.MeshStandardMaterial({ color: 0x04cf84 });
+    // Create animated path line with flowing effect
+    const lineGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
+    const lineMaterial = new THREE.MeshStandardMaterial({
+      color: 0x04cf84,
+      transparent: true,
+      opacity: 0.8,
+    });
     const line = new THREE.Mesh(lineGeometry, lineMaterial);
     line.rotation.x = Math.PI / 2;
-    line.position.z = -1;
+    line.position.z = -1.5;
     pathGroup.add(line);
 
-    // Add dots along the path
-    for (let i = 0; i < 5; i++) {
-      const dotGeometry = new THREE.SphereGeometry(0.05, 8, 8);
-      const dotMaterial = new THREE.MeshStandardMaterial({ color: 0x04cf84 });
+    // Add animated dots along the path
+    for (let i = 0; i < 8; i++) {
+      const dotGeometry = new THREE.SphereGeometry(0.04, 8, 8);
+      const dotMaterial = new THREE.MeshStandardMaterial({
+        color: 0x04cf84,
+        transparent: true,
+        opacity: 0.7,
+      });
       const dot = new THREE.Mesh(dotGeometry, dotMaterial);
-      dot.position.set(0, 0.1, -0.5 - i * 0.3);
+      dot.position.set(0, 0.1, -0.5 - i * 0.4);
+      dot.userData = {
+        originalZ: -0.5 - i * 0.4,
+        animationSpeed: 0.03 + i * 0.002,
+      };
       pathGroup.add(dot);
     }
 
@@ -119,7 +148,7 @@ export default function ARCanvas() {
     textCube.position.set(0, 1.2, 0);
     group.add(textCube);
 
-    // Add distance rings (smaller for 1 meter)
+    // Add animated distance rings
     for (let i = 1; i <= Math.min(distance, 3); i++) {
       const ringGeometry = new THREE.RingGeometry(
         i * 0.15,
@@ -134,6 +163,10 @@ export default function ARCanvas() {
       const ring = new THREE.Mesh(ringGeometry, ringMaterial);
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.05;
+      ring.userData = {
+        originalScale: 1,
+        animationSpeed: 0.02 + i * 0.01,
+      };
       group.add(ring);
     }
 
@@ -143,11 +176,16 @@ export default function ARCanvas() {
   const createStepIndicator = (step: number, totalSteps: number) => {
     const group = new THREE.Group();
 
-    // Create step counter
+    // Create step counter with pulsing effect
     const counterGeometry = new THREE.BoxGeometry(0.3, 0.1, 0.05);
-    const counterMaterial = new THREE.MeshStandardMaterial({ color: 0x04b7cf });
+    const counterMaterial = new THREE.MeshStandardMaterial({
+      color: 0x04b7cf,
+      transparent: true,
+      opacity: 0.9,
+    });
     const counter = new THREE.Mesh(counterGeometry, counterMaterial);
     counter.position.set(0, 1.8, 0);
+    counter.userData = { originalScale: 1 };
     group.add(counter);
 
     return group;
@@ -187,14 +225,14 @@ export default function ARCanvas() {
       // Add navigation elements
       const currentPathStep = NAVIGATION_PATH[currentStep];
 
-      // Add multiple arrows
+      // Add animated chevron path
       if (currentPathStep.arrowCount && currentPathStep.arrowCount > 0) {
-        const arrows = createMultipleArrows(
+        const chevronPath = createAnimatedChevronPath(
           currentPathStep.direction,
           currentPathStep.arrowCount
         );
-        arrows.position.set(0, 0, -3);
-        scene.add(arrows);
+        chevronPath.position.set(0, 0, -3);
+        scene.add(chevronPath);
       }
 
       // Add path indicator for forward movements
@@ -224,14 +262,82 @@ export default function ARCanvas() {
       stepIndicator.position.set(0, 0, -4);
       scene.add(stepIndicator);
 
-      // Animation loop
+      // Animation loop with flowing effects
       const animate = () => {
-        // Animate arrows
+        const time = Date.now() * 0.001;
+
+        // Animate chevron arrows flowing backward
         scene.children.forEach((child) => {
-          if (child.type === "Group") {
-            child.rotation.y += 0.005;
+          if (child.type === "Group" && child.children.length > 0) {
+            child.children.forEach((chevron) => {
+              if (chevron.userData.originalZ !== undefined) {
+                // Flow backward effect
+                chevron.position.z =
+                  chevron.userData.originalZ +
+                  Math.sin(time * chevron.userData.animationSpeed) * 0.1;
+                chevron.rotation.y += 0.01;
+              }
+            });
           }
         });
+
+        // Animate path dots
+        scene.children.forEach((child) => {
+          if (child.type === "Group") {
+            child.children.forEach((dot) => {
+              if (
+                dot.userData.originalZ !== undefined &&
+                dot instanceof THREE.Mesh
+              ) {
+                // Flowing dot effect
+                dot.position.z =
+                  dot.userData.originalZ +
+                  Math.sin(time * dot.userData.animationSpeed) * 0.05;
+                if (dot.material && "opacity" in dot.material) {
+                  (dot.material as THREE.MeshBasicMaterial).opacity =
+                    0.5 + Math.sin(time * 2) * 0.3;
+                }
+              }
+            });
+          }
+        });
+
+        // Animate distance rings
+        scene.children.forEach((child) => {
+          if (child.type === "Group") {
+            child.children.forEach((ring) => {
+              if (
+                ring.userData.originalScale !== undefined &&
+                ring instanceof THREE.Mesh
+              ) {
+                // Pulsing ring effect
+                const scale =
+                  ring.userData.originalScale +
+                  Math.sin(time * ring.userData.animationSpeed) * 0.1;
+                ring.scale.set(scale, scale, scale);
+                if (ring.material && "opacity" in ring.material) {
+                  (ring.material as THREE.MeshBasicMaterial).opacity =
+                    0.3 + Math.sin(time * 1.5) * 0.2;
+                }
+              }
+            });
+          }
+        });
+
+        // Animate step counter
+        scene.children.forEach((child) => {
+          if (child.type === "Group") {
+            child.children.forEach((counter) => {
+              if (counter.userData.originalScale !== undefined) {
+                // Pulsing counter effect
+                const scale =
+                  counter.userData.originalScale + Math.sin(time * 2) * 0.05;
+                counter.scale.set(scale, scale, scale);
+              }
+            });
+          }
+        });
+
         renderer.render(scene, camera);
       };
 
@@ -296,14 +402,14 @@ export default function ARCanvas() {
       // Add navigation elements
       const currentPathStep = NAVIGATION_PATH[currentStep];
 
-      // Add multiple arrows
+      // Add animated chevron path
       if (currentPathStep.arrowCount && currentPathStep.arrowCount > 0) {
-        const arrows = createMultipleArrows(
+        const chevronPath = createAnimatedChevronPath(
           currentPathStep.direction,
           currentPathStep.arrowCount
         );
-        arrows.position.set(0, 0, -3);
-        scene.add(arrows);
+        chevronPath.position.set(0, 0, -3);
+        scene.add(chevronPath);
       }
 
       // Add path indicator for forward movements
@@ -333,14 +439,82 @@ export default function ARCanvas() {
       stepIndicator.position.set(0, 0, -4);
       scene.add(stepIndicator);
 
-      // Animation loop
+      // Animation loop with flowing effects
       const animate = () => {
-        // Animate arrows
+        const time = Date.now() * 0.001;
+
+        // Animate chevron arrows flowing backward
         scene.children.forEach((child) => {
-          if (child.type === "Group") {
-            child.rotation.y += 0.005;
+          if (child.type === "Group" && child.children.length > 0) {
+            child.children.forEach((chevron) => {
+              if (chevron.userData.originalZ !== undefined) {
+                // Flow backward effect
+                chevron.position.z =
+                  chevron.userData.originalZ +
+                  Math.sin(time * chevron.userData.animationSpeed) * 0.1;
+                chevron.rotation.y += 0.01;
+              }
+            });
           }
         });
+
+        // Animate path dots
+        scene.children.forEach((child) => {
+          if (child.type === "Group") {
+            child.children.forEach((dot) => {
+              if (
+                dot.userData.originalZ !== undefined &&
+                dot instanceof THREE.Mesh
+              ) {
+                // Flowing dot effect
+                dot.position.z =
+                  dot.userData.originalZ +
+                  Math.sin(time * dot.userData.animationSpeed) * 0.05;
+                if (dot.material && "opacity" in dot.material) {
+                  (dot.material as THREE.MeshBasicMaterial).opacity =
+                    0.5 + Math.sin(time * 2) * 0.3;
+                }
+              }
+            });
+          }
+        });
+
+        // Animate distance rings
+        scene.children.forEach((child) => {
+          if (child.type === "Group") {
+            child.children.forEach((ring) => {
+              if (
+                ring.userData.originalScale !== undefined &&
+                ring instanceof THREE.Mesh
+              ) {
+                // Pulsing ring effect
+                const scale =
+                  ring.userData.originalScale +
+                  Math.sin(time * ring.userData.animationSpeed) * 0.1;
+                ring.scale.set(scale, scale, scale);
+                if (ring.material && "opacity" in ring.material) {
+                  (ring.material as THREE.MeshBasicMaterial).opacity =
+                    0.3 + Math.sin(time * 1.5) * 0.2;
+                }
+              }
+            });
+          }
+        });
+
+        // Animate step counter
+        scene.children.forEach((child) => {
+          if (child.type === "Group") {
+            child.children.forEach((counter) => {
+              if (counter.userData.originalScale !== undefined) {
+                // Pulsing counter effect
+                const scale =
+                  counter.userData.originalScale + Math.sin(time * 2) * 0.05;
+                counter.scale.set(scale, scale, scale);
+              }
+            });
+          }
+        });
+
         renderer.render(scene, camera);
       };
 
@@ -418,9 +592,7 @@ export default function ARCanvas() {
         <h1 className="text-4xl font-bold text-white mb-4">
           🧭 AR Navigation Demo
         </h1>
-        <p className="text-gray-300 mb-6">
-          Follow the arrows to complete the demo!
-        </p>
+        <p className="text-gray-300 mb-6">Follow the flowing chevron arrows!</p>
 
         {isARSupported === false && (
           <div className="mb-4 p-3 bg-yellow-500 text-black rounded-lg">
@@ -515,9 +687,7 @@ export default function ARCanvas() {
             <div className="text-center">
               <div className="text-6xl mb-4">🧭</div>
               <p className="text-lg font-semibold">AR Navigation Demo</p>
-              <p className="text-sm mt-2">
-                Follow the arrows to complete the demo
-              </p>
+              <p className="text-sm mt-2">Follow the flowing chevron arrows</p>
               {isARSupported === false && (
                 <p className="text-xs mt-2 text-yellow-400">3D preview mode</p>
               )}
@@ -527,7 +697,7 @@ export default function ARCanvas() {
       </div>
 
       <div className="mt-6 text-center text-gray-400 text-sm">
-        <p>🎯 Follow the directional arrows in AR</p>
+        <p>🎯 Follow the flowing chevron arrows in AR</p>
         <p>📱 Use the navigation controls to change steps</p>
         <p>✨ Perfect for hackathon demos!</p>
       </div>
