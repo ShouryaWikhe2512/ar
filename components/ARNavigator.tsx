@@ -3,8 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Camera } from "./Camera";
 import NavigationOverlay from "./NavigationOverlay";
+import ARArrow from "./ARArrow";
 import { DirectionStep, NavigationState } from "../app/types";
 
+// Add to imports
+import ARDistanceIndicator from "./ARDistanceIndicator";
+
+// Add inside return after ARArrow
 type ARNavigatorProps = {
   directions: DirectionStep[];
 };
@@ -51,15 +56,39 @@ export default function ARNavigator({ directions }: ARNavigatorProps) {
     setState((prev) => ({ ...prev, debugMode: !prev.debugMode }));
   };
 
+  const currentDirection = directions[state.currentStep].type as
+    | "left"
+    | "right"
+    | "straight";
+
   return (
-    <div className="relative h-screen w-full">
-      <Camera debug={state.debugMode} />
-      <NavigationOverlay
-        step={directions[state.currentStep]}
-        distance={state.distance}
-      />
+    <div className="relative h-screen w-full overflow-hidden">
+      {/* Camera with lower z-index */}
+      <div className="absolute inset-0 z-0">
+        <Camera debug={state.debugMode} />
+      </div>
+
+      {/* AR Objects with higher z-index */}
+      <div className="absolute inset-0 z-10">
+        {state.currentStep < directions.length &&
+          directions[state.currentStep].type !== "arrival" && (
+            <ARArrow direction={currentDirection} />
+          )}
+      </div>
+
+      <ARDistanceIndicator distance={state.distance} />
+
+      {/* Overlay UI */}
+      <div className="absolute inset-0 z-20">
+        <NavigationOverlay
+          step={directions[state.currentStep]}
+          distance={state.distance}
+        />
+      </div>
+
+      {/* Debug button */}
       <button
-        className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full z-10"
+        className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full z-30"
         onClick={toggleDebugMode}
       >
         {state.debugMode ? "Live" : "Debug"}

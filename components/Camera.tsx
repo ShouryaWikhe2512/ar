@@ -11,6 +11,40 @@ export function Camera({ debug }: CameraProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // Add AR grid overlay
+  useEffect(() => {
+    if (debug) return;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    ctx.strokeStyle = "rgba(0, 255, 0, 0.5)";
+    ctx.lineWidth = 1;
+    // Draw grid
+    const gridSize = 50;
+    for (let x = 0; x < canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    // Draw center marker
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    if (gridRef.current) {
+      gridRef.current.style.backgroundImage = `url(${canvas.toDataURL()})`;
+    }
+  }, [debug]);
 
   useEffect(() => {
     if (!debug && !cameraStream) {
@@ -29,7 +63,6 @@ export function Camera({ debug }: CameraProps) {
     try {
       setIsLoading(true);
       setError(null);
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
@@ -38,11 +71,9 @@ export function Camera({ debug }: CameraProps) {
         },
         audio: false,
       });
-
       setCameraStream(stream);
       setIsLoading(false);
     } catch (err: any) {
-      console.error("Camera error:", err);
       setError(err.message || "Failed to access camera");
       setIsLoading(false);
     }
@@ -51,7 +82,6 @@ export function Camera({ debug }: CameraProps) {
   if (debug) {
     return <CameraFallback />;
   }
-
   if (error) {
     return (
       <div className="w-full h-full bg-red-900 flex items-center justify-center">
@@ -68,22 +98,30 @@ export function Camera({ debug }: CameraProps) {
       </div>
     );
   }
-
   if (isLoading) {
     return <CameraFallback />;
   }
-
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted
-      className="w-full h-full object-cover"
-      style={{
-        backgroundColor: "black",
-      }}
-    />
+    <div className="relative w-full h-full">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="w-full h-full object-cover"
+        style={{ backgroundColor: "black" }}
+      />
+      {/* AR Grid Overlay */}
+      <div
+        ref={gridRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundSize: "50px 50px",
+          opacity: 0.7,
+          zIndex: 5,
+        }}
+      />
+    </div>
   );
 }
 
