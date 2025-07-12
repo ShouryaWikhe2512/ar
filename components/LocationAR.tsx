@@ -60,14 +60,16 @@ export default function LocationAR() {
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Create camera
+    // Create camera - positioned to view fixed world objects
     const camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    camera.position.set(0, 2, 5);
+    // Position camera to look at fixed world objects
+    camera.position.set(0, 1.5, 8);
+    camera.lookAt(0, 1.5, 0);
     cameraRef.current = camera;
 
     // Create renderer
@@ -94,12 +96,13 @@ export default function LocationAR() {
     directionalLight.shadow.mapSize.height = 2048;
     scene.add(directionalLight);
 
-    // Create 3D boards group
+    // Create 3D boards group - FIXED WORLD POSITIONS
     const boardsGroup = new THREE.Group();
+    boardsGroup.position.set(0, 0, 0); // Fixed world origin
     boardsRef.current = boardsGroup;
     scene.add(boardsGroup);
 
-    // Create Dairy Section Board
+    // Create Dairy Section Board - FIXED POSITION
     const dairyBoardGeometry = new THREE.BoxGeometry(4, 3, 0.2);
     const dairyBoardMaterial = new THREE.MeshPhongMaterial({
       color: 0xffd700,
@@ -109,7 +112,7 @@ export default function LocationAR() {
       emissiveIntensity: 0.2,
     });
     const dairyBoard = new THREE.Mesh(dairyBoardGeometry, dairyBoardMaterial);
-    dairyBoard.position.set(-6, 2, -3);
+    dairyBoard.position.set(-8, 2, -5); // Fixed world position
     dairyBoard.castShadow = true;
     dairyBoard.receiveShadow = true;
     boardsGroup.add(dairyBoard);
@@ -125,7 +128,7 @@ export default function LocationAR() {
     dairyText.position.set(0, 0, 0.12);
     dairyBoard.add(dairyText);
 
-    // Create Personal Care Section Board
+    // Create Personal Care Section Board - FIXED POSITION
     const personalCareBoardGeometry = new THREE.BoxGeometry(4, 3, 0.2);
     const personalCareBoardMaterial = new THREE.MeshPhongMaterial({
       color: 0xff69b4,
@@ -138,7 +141,7 @@ export default function LocationAR() {
       personalCareBoardGeometry,
       personalCareBoardMaterial
     );
-    personalCareBoard.position.set(6, 2, -3);
+    personalCareBoard.position.set(8, 2, -5); // Fixed world position
     personalCareBoard.castShadow = true;
     personalCareBoard.receiveShadow = true;
     boardsGroup.add(personalCareBoard);
@@ -157,8 +160,9 @@ export default function LocationAR() {
     personalCareText.position.set(0, 0, 0.12);
     personalCareBoard.add(personalCareText);
 
-    // Create 3D arrow group
+    // Create 3D arrow group - FIXED WORLD POSITION
     const arrowGroup = new THREE.Group();
+    arrowGroup.position.set(0, 1.5, -3); // Fixed world position
     arrowRef.current = arrowGroup;
     scene.add(arrowGroup);
 
@@ -172,7 +176,7 @@ export default function LocationAR() {
       emissiveIntensity: 0.5,
     });
     const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
-    arrow.position.set(0, 0, -2);
+    arrow.position.set(0, 0, 0);
     arrow.rotation.x = -Math.PI / 2; // Point forward
     arrow.castShadow = true;
     arrowGroup.add(arrow);
@@ -196,7 +200,7 @@ export default function LocationAR() {
       side: THREE.DoubleSide,
     });
     const ring1 = new THREE.Mesh(ringGeometry1, ringMaterial1);
-    ring1.position.set(0, 0, -2);
+    ring1.position.set(0, 0, 0);
     ring1.rotation.x = -Math.PI / 2;
     arrowGroup.add(ring1);
 
@@ -208,12 +212,12 @@ export default function LocationAR() {
       side: THREE.DoubleSide,
     });
     const ring2 = new THREE.Mesh(ringGeometry2, ringMaterial2);
-    ring2.position.set(0, 0, -2);
+    ring2.position.set(0, 0, 0);
     ring2.rotation.x = -Math.PI / 2;
     arrowGroup.add(ring2);
 
-    // Ground plane for reference
-    const groundGeometry = new THREE.PlaneGeometry(20, 20);
+    // Ground plane for reference - FIXED WORLD POSITION
+    const groundGeometry = new THREE.PlaneGeometry(30, 30);
     const groundMaterial = new THREE.MeshBasicMaterial({
       color: 0xcccccc,
       transparent: true,
@@ -221,7 +225,7 @@ export default function LocationAR() {
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -2;
+    ground.position.y = -1;
     ground.receiveShadow = true;
     scene.add(ground);
 
@@ -231,18 +235,21 @@ export default function LocationAR() {
 
       const time = Date.now() * 0.001;
 
-      // Animate boards floating
+      // Animate boards floating - but keep them in fixed world positions
       if (boardsGroup) {
         boardsGroup.children.forEach((board, index) => {
-          board.position.y = 2 + Math.sin(time + index * Math.PI) * 0.5;
+          // Only animate Y position (floating), keep X and Z fixed
+          const baseY = board === dairyBoard ? 2 : 2;
+          board.position.y = baseY + Math.sin(time + index * Math.PI) * 0.5;
           board.rotation.y = Math.sin(time * 0.5) * 0.1;
         });
       }
 
-      // Animate arrow
+      // Animate arrow - but keep it in fixed world position
       if (arrowGroup) {
         arrowGroup.rotation.y = NAVIGATION_STEPS[currentStep].arrowRotation;
-        arrowGroup.position.y = 1 + Math.sin(time * 2) * 0.3;
+        // Only animate Y position (floating), keep X and Z fixed
+        arrowGroup.position.y = 1.5 + Math.sin(time * 2) * 0.3;
 
         // Scale arrow based on step (simulate proximity)
         const scale = 1 + currentStep * 0.2;
