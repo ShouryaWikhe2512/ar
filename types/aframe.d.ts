@@ -13,6 +13,8 @@ declare global {
       'a-text': any;
       'a-ring': any;
       'a-light': any;
+      'a-sphere': any;
+      'a-plane': any;
     }
   }
 }
